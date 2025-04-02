@@ -18,7 +18,8 @@ if ($renamePC -eq "Oui") {
 $adapter = Get-NetAdapter | Where-Object {$_.Status -eq "Up"}
 $dhcpInfo = Get-NetIPAddress -InterfaceAlias $adapter.InterfaceAlias | Where-Object {$_.AddressFamily -eq "IPv4"}
 if ($dhcpInfo) {
-    New-NetIPAddress -IPAddress $dhcpInfo.IPAddress -PrefixLength $dhcpInfo.PrefixLength -DefaultGateway $dhcpInfo.DefaultGateway -InterfaceAlias $adapter.InterfaceAlias
+    $defaultGateway = if ($dhcpInfo.DefaultGateway) { $dhcpInfo.DefaultGateway } else { $null }
+    New-NetIPAddress -IPAddress $dhcpInfo.IPAddress -PrefixLength $dhcpInfo.PrefixLength -InterfaceAlias $adapter.InterfaceAlias -DefaultGateway $defaultGateway
     Set-DnsClientServerAddress -InterfaceAlias $adapter.InterfaceAlias -ServerAddresses $dhcpInfo.DNSServer
     Write-Host "L'adresse IP fixe a été configurée en utilisant l'IP attribuée par le DHCP."
 } else {
