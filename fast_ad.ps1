@@ -33,40 +33,8 @@ if ($createForest -eq "Oui") {
     # Configurer la nouvelle forêt
     Write-Host "Configuration de la forêt Active Directory..."
     Install-ADDSForest -DomainName $forestName -Force -SafeModeAdministratorPassword (ConvertTo-SecureString -AsPlainText (Read-Host "Entrez un mot de passe pour le mode restauration AD" -AsSecureString) -Force)
-
-    # Création des OUs
-    Write-Host "Création des Unités Organisationnelles (OU)..."
-    while ($true) {
-        $ouName = Read-Host "Entrez le nom de l'OU à créer (ou appuyez sur Entrée pour terminer)"
-        if ([string]::IsNullOrWhiteSpace($ouName)) {
-            break
-        }
-        New-ADOrganizationalUnit -Name $ouName -Path "DC=$($forestName -replace '\.', ',DC=')"
-        Write-Host "OU '$ouName' créée avec succès."
-    }
 } else {
     Write-Host "Création de la forêt ignorée."
 }
-
-# Importer les utilisateurs depuis un fichier CSV
-Write-Host "Importation des utilisateurs depuis des fichiers CSV..."
-while ($true) {
-    $csvPath = Read-Host "Entrez le chemin du fichier CSV contenant les utilisateurs (ou appuyez sur Entrée pour terminer)"
-    if ([string]::IsNullOrWhiteSpace($csvPath)) {
-        break
-    }
-    if (-not (Test-Path $csvPath)) {
-        Write-Host "Le fichier '$csvPath' n'existe pas. Veuillez réessayer."
-        continue
-    }
-    $ouPath = Read-Host "Entrez le chemin de l'OU où importer les utilisateurs (ex: OU=Users,DC=example,DC=com)"
-    $users = Import-Csv -Path $csvPath
-    foreach ($user in $users) {
-        New-ADUser -Name $user.Name -GivenName $user.FirstName -Surname $user.LastName -SamAccountName $user.SamAccountName -UserPrincipalName $user.UserPrincipalName -Path $ouPath -AccountPassword (ConvertTo-SecureString $user.Password -AsPlainText -Force) -Enabled $true
-        Write-Host "Utilisateur '$($user.Name)' importé avec succès dans '$ouPath'."
-    }
-}
-
-Write-Host "Importation des utilisateurs terminée."
 
 Write-Host "Déploiement terminé."
