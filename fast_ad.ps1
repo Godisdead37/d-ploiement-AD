@@ -18,8 +18,15 @@ if ($renamePC -eq "Oui") {
 $adapter = Get-NetAdapter | Where-Object {$_.Status -eq "Up"}
 $dhcpInfo = Get-NetIPAddress -InterfaceAlias $adapter.InterfaceAlias | Where-Object {$_.AddressFamily -eq "IPv4"}
 if ($dhcpInfo) {
-    $defaultGateway = if ($dhcpInfo.DefaultGateway) { $dhcpInfo.DefaultGateway } else { $null }
-    New-NetIPAddress -IPAddress $dhcpInfo.IPAddress -PrefixLength $dhcpInfo.PrefixLength -InterfaceAlias $adapter.InterfaceAlias -DefaultGateway $defaultGateway
+    $params = @{
+        IPAddress       = $dhcpInfo.IPAddress
+        PrefixLength    = $dhcpInfo.PrefixLength
+        InterfaceAlias  = $adapter.InterfaceAlias
+    }
+    if ($dhcpInfo.DefaultGateway) {
+        $params.DefaultGateway = $dhcpInfo.DefaultGateway
+    }
+    New-NetIPAddress @params
     Set-DnsClientServerAddress -InterfaceAlias $adapter.InterfaceAlias -ServerAddresses $dhcpInfo.DNSServer
     Write-Host "L'adresse IP fixe a été configurée en utilisant l'IP attribuée par le DHCP."
 } else {
@@ -41,7 +48,12 @@ if ($createForest -eq "Oui") {
 
     # Configurer la nouvelle forêt et promouvoir le PC en contrôleur de domaine
     Write-Host "Configuration de la forêt Active Directory et promotion en contrôleur de domaine..."
-    Install-ADDSForest -DomainName $forestName -Force -SafeModeAdministratorPassword (ConvertTo-SecureString -AsPlainText (Read-Host "Entrez un mot de passe pour le mode restauration AD" -AsSecureString) -Force)
+    Install-ADDSForest -DomainName $forestName `
+        -SafeModeAdministratorPassword (ConvertTo-SecureString -AsPlainText (Read-Host "Entrez un mot de passe pour le mode restauration AD") -Force) `
+        -Force `
+        -InstallDNS
+    Write-Host "Promotion en contrôleur de domaine effectuée. Le système va redémarrer pour finaliser la configuration."
+    Restart-Computer
 } else {
     Write-Host "Création de la forêt ignorée."
 }
