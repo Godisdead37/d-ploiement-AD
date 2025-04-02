@@ -20,10 +20,6 @@ Ce script PowerShell permet d'automatiser plusieurs étapes nécessaires pour co
    L'utilisateur peut choisir de créer une nouvelle forêt AD. Si cette option est sélectionnée :
    - Le script demande le nom de la forêt.
    - Configure la forêt.
-   - Permet de créer des Unités Organisationnelles (OU) personnalisées.
-
-6. **Importation des utilisateurs depuis des fichiers CSV**  
-   L'utilisateur peut importer des utilisateurs dans des OUs spécifiques en fournissant un fichier CSV contenant les informations des utilisateurs.
 
 ## Prérequis
 
@@ -49,32 +45,11 @@ Ce script PowerShell permet d'automatiser plusieurs étapes nécessaires pour co
    Le script installe automatiquement le rôle si nécessaire.
 
 5. **Création de la forêt (optionnel)**  
-   Répondez "Oui" ou "Non" lorsque le script demande si vous souhaitez créer une forêt. Si "Oui", fournissez le nom de la forêt et configurez les OUs.
-
-6. **Importation des utilisateurs**  
-   Fournissez le chemin des fichiers CSV contenant les utilisateurs et spécifiez l'OU cible pour chaque fichier.
-
-### Format du fichier CSV
-
-Le fichier CSV doit contenir les colonnes suivantes :
-- `Name` : Nom complet de l'utilisateur.
-- `FirstName` : Prénom.
-- `LastName` : Nom de famille.
-- `SamAccountName` : Nom de connexion.
-- `UserPrincipalName` : Nom principal de l'utilisateur (ex. `user@example.com`).
-- `Password` : Mot de passe de l'utilisateur.
-
-Exemple :
-```csv
-Name,FirstName,LastName,SamAccountName,UserPrincipalName,Password
-John Doe,John,Doe,jdoe,jdoe@example.com,P@ssw0rd!
-Jane Smith,Jane,Smith,jsmith,jsmith@example.com,P@ssw0rd!
-```
+   Répondez "Oui" ou "Non" lorsque le script demande si vous souhaitez créer une forêt. Si "Oui", fournissez le nom de la forêt.
 
 ## Notes
 
-- Assurez-vous que le fichier CSV est correctement formaté avant de l'importer.
-- Si vous choisissez de ne pas créer une forêt, vous pouvez toujours importer des utilisateurs dans une forêt existante.
+- Si vous choisissez de ne pas créer une forêt, le script s'arrêtera après l'installation du rôle AD DS.
 
 ## Avertissement
 
