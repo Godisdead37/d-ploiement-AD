@@ -1,60 +1,61 @@
-# Déploiement Active Directory Automatisé
+# Script de Configuration d'un Serveur Windows Server 2022
 
-Ce script PowerShell permet d'automatiser plusieurs étapes nécessaires pour configurer un contrôleur de domaine Active Directory (AD). Il inclut les fonctionnalités suivantes :
-
-## Fonctionnalités
-
-1. **Vérification des privilèges administratifs**  
-   Le script vérifie si l'utilisateur dispose des droits administratifs avant de continuer.
-
-2. **Renommage du PC**  
-   Demande à l'utilisateur un nouveau nom NetBIOS pour le PC et applique le changement.
-
-3. **Configuration d'une adresse IP fixe**  
-   Permet de configurer une adresse IP, un masque de sous-réseau, une passerelle par défaut et un serveur DNS.
-
-4. **Installation du rôle Active Directory Domain Services (AD DS)**  
-   Installe le rôle AD DS si celui-ci n'est pas déjà installé.
-
-5. **Création d'une forêt Active Directory (optionnel)**  
-   L'utilisateur peut choisir de créer une nouvelle forêt AD. Si cette option est sélectionnée :
-   - Le script demande le nom de la forêt.
-   - Configure la forêt.
+## Description
+Ce script PowerShell automatise la configuration d'un serveur Windows Server 2022. Il permet de :
+- Vérifier les prérequis réseau.
+- Renommer le serveur.
+- Installer le rôle Active Directory Domain Services (ADDS).
+- Configurer une adresse IP statique après l'installation d'ADDS.
+- Promouvoir le serveur en tant que contrôleur de domaine.
 
 ## Prérequis
+- Exécuter le script en mode administrateur.
+- Assurez-vous que le serveur dispose d'une connexion réseau fonctionnelle.
+- Le service DNS local doit être opérationnel.
 
-- Windows Server avec PowerShell installé.
-- Droits administratifs pour exécuter le script.
-- Les modules nécessaires pour gérer Active Directory doivent être disponibles (ex. `Active Directory Module for Windows PowerShell`).
+## Fonctionnalités
+1. **Vérification des prérequis** :
+   - Teste la connectivité réseau et la disponibilité du service DNS local.
 
-## Utilisation
+2. **Renommage du serveur** :
+   - Permet de renommer le serveur avant de continuer la configuration.
+   - **Important** : Après le redémarrage du serveur suite au renommage, vous devez relancer ce script pour continuer la configuration.
 
-1. **Exécution du script**  
-   Lancez le script avec des privilèges administratifs :
+3. **Installation du rôle ADDS** :
+   - Installe le rôle Active Directory Domain Services avec journalisation.
+
+4. **Configuration IP statique** :
+   - Configure une adresse IP statique après l'installation d'ADDS.
+   - Définit le DNS sur la passerelle par défaut.
+
+5. **Promotion en contrôleur de domaine** :
+   - Promeut le serveur en tant que contrôleur de domaine avec gestion des blocages et journalisation.
+
+## Instructions d'utilisation
+1. Téléchargez le script et placez-le sur le serveur Windows Server 2022.
+2. Ouvrez PowerShell en tant qu'administrateur.
+3. Exécutez le script :
    ```powershell
    .\fast_ad.ps1
    ```
+4. Suivez les instructions affichées à l'écran :
+   - Renommez le serveur si nécessaire.
+   - **Relancez le script après le redémarrage si vous avez renommé le serveur.**
+   - Confirmez la configuration IP statique.
+   - Entrez le nom de domaine et le mot de passe SafeMode pour la promotion en contrôleur de domaine.
 
-2. **Renommage du PC**  
-   Fournissez un nouveau nom NetBIOS lorsque le script le demande.
+## Journaux
+- Les journaux d'installation et de promotion sont enregistrés dans :
+  - `C:\Windows\Temp\ADDSInstall.log`
+  - `C:\Windows\Temp\ADDSPromotion.log`
 
-3. **Configuration réseau**  
-   Entrez les informations réseau (IP, masque, passerelle, DNS) lorsque le script le demande.
+## Dépannage
+- Si l'installation ou la promotion échoue, consultez les journaux pour plus de détails.
+- Assurez-vous que le service DNS est correctement configuré et accessible.
 
-4. **Installation du rôle AD DS**  
-   Le script installe automatiquement le rôle si nécessaire.
-
-5. **Création de la forêt (optionnel)**  
-   Répondez "Oui" ou "Non" lorsque le script demande si vous souhaitez créer une forêt. Si "Oui", fournissez le nom de la forêt.
-
-## Notes
-
-- Si vous choisissez de ne pas créer une forêt, le script s'arrêtera après l'installation du rôle AD DS.
-
-## Avertissement
-
-Ce script effectue des modifications importantes sur le système. Utilisez-le uniquement dans un environnement contrôlé ou après avoir effectué une sauvegarde complète.
+## Avertissements
+- Ce script redémarrera automatiquement le serveur après certaines étapes (renommage, promotion en contrôleur de domaine).
+- Vérifiez que toutes les données importantes sont sauvegardées avant d'exécuter le script.
 
 ## Auteur
-
-Créé par Louis.
+- Script développé par Louis.
