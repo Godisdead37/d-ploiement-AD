@@ -1,61 +1,75 @@
-# Vérifier si le script est exécuté avec des privilèges administratifs
-if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
-    Write-Error "Ce script doit être exécuté en tant qu'administrateur."
+# Script pour configurer un serveur Windows Server 2022
+# Exécuter en mode administrateur
+
+# Demander si l'utilisateur veut renommer le serveur
+$renameChoice = Read-Host "Voulez-vous renommer le serveur ? (Oui/Non)"
+if ($renameChoice -eq "Oui" -or $renameChoice -eq "oui") {
+    $newName = Read-Host "Entrez le nouveau nom du serveur"
+    Rename-Computer -NewName $newName -Force -Restart
+    Write-Host "Le serveur va redémarrer avec le nouveau nom : $newName"
     exit
 }
 
-# Demander si l'utilisateur souhaite renommer le PC
-$renamePC = Read-Host "Souhaitez-vous renommer ce PC ? (Oui/Non)"
-if ($renamePC -eq "Oui") {
-    $computerName = Read-Host "Entrez le nouveau nom NetBIOS pour ce PC"
-    Rename-Computer -NewName $computerName -Force -Restart:$false
-    Write-Host "Le PC a été renommé en '$computerName'."
-} else {
-    Write-Host "Renommage du PC ignoré."
+# Récupérer les informations IP actuelles attribuées par DHCP
+$interface = Get-NetIPConfiguration
+$currentIP = $interface.IPv4Address.IPAddress
+$gateway = $interface.IPv4DefaultGateway.NextHop
+$dns = $interface.DNSServer.ServerAddresses
+$interfaceIndex = (Get-NetAdapter).ifIndex
+
+# Afficher les informations récupérées
+Write-Host "IP actuelle (DHCP) : $currentIP"
+Write-Host "Passerelle : $gateway"
+Write-Host "DNS : $dns"
+
+# Demander la confirmation pour passer en IP statique
+$ipChoice = Read-Host "Voulez-vous passer cette configuration en statique ? (Oui/Non)"
+if ($ipChoice -eq "Oui" -or $ipChoice -eq "oui") {
+    # Désactiver le DHCP sur l'interface
+    Set-NetIPInterface -InterfaceIndex $interfaceIndex -Dhcp Disabled
+    Write-Host "DHCP désactivé sur l'interface."
+
+    # Supprimer l'adresse IP existante pour éviter les conflits
+    $existingIP = Get-NetIPAddress -InterfaceIndex $interfaceIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue
+    if ($existingIP -and $existingIP.IPAddress -eq $currentIP) {
+        Remove-NetIPAddress -InterfaceIndex $interfaceIndex -IPAddress $currentIP -Confirm:$false
+        Write-Host "Adresse IP existante supprimée."
+    }
+
+    # Configurer l'IP statique avec les valeurs récupérées
+    New-NetIPAddress -InterfaceIndex $interfaceIndex -IPAddress $currentIP -PrefixLength 24 -DefaultGateway $gateway
+    Set-DnsClientServerAddress -InterfaceIndex $interfaceIndex -ServerAddresses $dns
+    Write-Host "Configuration IP statique appliquée avec succès : $currentIP"
 }
 
-# Configurer une IP fixe basée sur l'IP actuelle attribuée par le DHCP
-$adapter = Get-NetAdapter | Where-Object {$_.Status -eq "Up"}
-$dhcpInfo = Get-NetIPAddress -InterfaceAlias $adapter.InterfaceAlias | Where-Object {$_.AddressFamily -eq "IPv4"}
-if ($dhcpInfo) {
-    $params = @{
-        IPAddress       = $dhcpInfo.IPAddress
-        PrefixLength    = $dhcpInfo.PrefixLength
-        InterfaceAlias  = $adapter.InterfaceAlias
-    }
-    if ($dhcpInfo.DefaultGateway) {
-        $params.DefaultGateway = $dhcpInfo.DefaultGateway
-    }
-    New-NetIPAddress @params
-    Set-DnsClientServerAddress -InterfaceAlias $adapter.InterfaceAlias -ServerAddresses $dhcpInfo.DNSServer
-    Write-Host "L'adresse IP fixe a été configurée en utilisant l'IP attribuée par le DHCP."
+# Installation du rôle ADDS
+Write-Host "Installation du rôle Active Directory Domain Services..."
+$addsInstall = Install-WindowsFeature -Name AD-Domain-Services -IncludeManagementTools
+if ($addsInstall.Success) {
+    Write-Host "Rôle ADDS installé avec succès."
 } else {
-    Write-Error "Impossible de récupérer les informations DHCP. Vérifiez la connectivité réseau."
+    Write-Host "Échec de l'installation du rôle ADDS. Erreur : $($addsInstall.ExitCode)"
     exit
 }
 
-# Installer le rôle AD DS si nécessaire
-if (-not (Get-WindowsFeature -Name AD-Domain-Services).Installed) {
-    Write-Host "Installation du rôle Active Directory Domain Services..."
-    Install-WindowsFeature -Name AD-Domain-Services -IncludeManagementTools
-}
+# Promotion en contrôleur de domaine
+$domainName = Read-Host "Entrez le nom de domaine (ex: contoso.local)"
+$safeModePassword = Read-Host "Entrez le mot de passe SafeMode (sécurisé)" -AsSecureString
 
-# Demander si l'utilisateur souhaite créer une forêt
-$createForest = Read-Host "Souhaitez-vous créer une nouvelle forêt Active Directory ? (Oui/Non)"
-if ($createForest -eq "Oui") {
-    # Demander le nom de la forêt à l'utilisateur
-    $forestName = Read-Host "Entrez le nom de la forêt à créer (ex: example.com)"
-
-    # Configurer la nouvelle forêt et promouvoir le PC en contrôleur de domaine
-    Write-Host "Configuration de la forêt Active Directory et promotion en contrôleur de domaine..."
-    Install-ADDSForest -DomainName $forestName `
-        -SafeModeAdministratorPassword (ConvertTo-SecureString -AsPlainText (Read-Host "Entrez un mot de passe pour le mode restauration AD") -Force) `
+Write-Host "Démarrage de la promotion du serveur en contrôleur de domaine..."
+try {
+    Install-ADDSForest `
+        -DomainName $domainName `
+        -SafeModeAdministratorPassword $safeModePassword `
+        -InstallDns `
         -Force `
-        -InstallDNS
-    Write-Host "Promotion en contrôleur de domaine effectuée. Le système va redémarrer pour finaliser la configuration."
-    Restart-Computer
-} else {
-    Write-Host "Création de la forêt ignorée."
+        -NoRebootOnCompletion `
+        -ErrorAction Stop
+    Write-Host "Promotion du contrôleur de domaine réussie."
+} catch {
+    Write-Host "Erreur lors de la promotion du DC : $_"
+    exit
 }
 
-Write-Host "Déploiement terminé."
+Write-Host "Configuration terminée. Le serveur va redémarrer pour finaliser la promotion."
+Restart-Computer -Force
