@@ -4,19 +4,27 @@ if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdent
     exit
 }
 
-# Renommer le PC
-$computerName = Read-Host "Entrez le nouveau nom NetBIOS pour ce PC"
-Rename-Computer -NewName $computerName -Force -Restart:$false
-Write-Host "Le PC a été renommé en '$computerName'."
+# Demander si l'utilisateur souhaite renommer le PC
+$renamePC = Read-Host "Souhaitez-vous renommer ce PC ? (Oui/Non)"
+if ($renamePC -eq "Oui") {
+    $computerName = Read-Host "Entrez le nouveau nom NetBIOS pour ce PC"
+    Rename-Computer -NewName $computerName -Force -Restart:$false
+    Write-Host "Le PC a été renommé en '$computerName'."
+} else {
+    Write-Host "Renommage du PC ignoré."
+}
 
-# Configurer une IP fixe
-$ipAddress = Read-Host "Entrez l'adresse IP fixe (ex: 192.168.1.100)"
-$subnetMask = Read-Host "Entrez le masque de sous-réseau (ex: 255.255.255.0)"
-$defaultGateway = Read-Host "Entrez la passerelle par défaut (ex: 192.168.1.1)"
-$dnsServer = Read-Host "Entrez l'adresse du serveur DNS (ex: 192.168.1.1)"
-New-NetIPAddress -IPAddress $ipAddress -PrefixLength ($subnetMask -split '\.').Count * 8 -DefaultGateway $defaultGateway -InterfaceAlias (Get-NetAdapter | Where-Object {$_.Status -eq "Up"}).InterfaceAlias
-Set-DnsClientServerAddress -InterfaceAlias (Get-NetAdapter | Where-Object {$_.Status -eq "Up"}).InterfaceAlias -ServerAddresses $dnsServer
-Write-Host "L'adresse IP fixe a été configurée."
+# Configurer une IP fixe basée sur l'IP actuelle attribuée par le DHCP
+$adapter = Get-NetAdapter | Where-Object {$_.Status -eq "Up"}
+$dhcpInfo = Get-NetIPAddress -InterfaceAlias $adapter.InterfaceAlias | Where-Object {$_.AddressFamily -eq "IPv4"}
+if ($dhcpInfo) {
+    New-NetIPAddress -IPAddress $dhcpInfo.IPAddress -PrefixLength $dhcpInfo.PrefixLength -DefaultGateway $dhcpInfo.DefaultGateway -InterfaceAlias $adapter.InterfaceAlias
+    Set-DnsClientServerAddress -InterfaceAlias $adapter.InterfaceAlias -ServerAddresses $dhcpInfo.DNSServer
+    Write-Host "L'adresse IP fixe a été configurée en utilisant l'IP attribuée par le DHCP."
+} else {
+    Write-Error "Impossible de récupérer les informations DHCP. Vérifiez la connectivité réseau."
+    exit
+}
 
 # Installer le rôle AD DS si nécessaire
 if (-not (Get-WindowsFeature -Name AD-Domain-Services).Installed) {
@@ -30,8 +38,8 @@ if ($createForest -eq "Oui") {
     # Demander le nom de la forêt à l'utilisateur
     $forestName = Read-Host "Entrez le nom de la forêt à créer (ex: example.com)"
 
-    # Configurer la nouvelle forêt
-    Write-Host "Configuration de la forêt Active Directory..."
+    # Configurer la nouvelle forêt et promouvoir le PC en contrôleur de domaine
+    Write-Host "Configuration de la forêt Active Directory et promotion en contrôleur de domaine..."
     Install-ADDSForest -DomainName $forestName -Force -SafeModeAdministratorPassword (ConvertTo-SecureString -AsPlainText (Read-Host "Entrez un mot de passe pour le mode restauration AD" -AsSecureString) -Force)
 } else {
     Write-Host "Création de la forêt ignorée."
